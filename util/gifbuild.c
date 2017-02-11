@@ -692,6 +692,7 @@ static void DumpExtensions(GifFileType *GifFileOut,
 	    putchar('\n');
 	    while (!last && ep[1].Function == CONTINUE_EXT_FUNC_CODE) {
 		++ep;
+		last = (ep - ExtensionBlocks == (ExtensionBlockCount - 1));
 		VisibleDumpBuffer(ep->Bytes, ep->ByteCount);
 		putchar('\n');
 	    }
@@ -703,6 +704,7 @@ static void DumpExtensions(GifFileType *GifFileOut,
 	    putchar('\n');
 	    while (!last && ep[1].Function == CONTINUE_EXT_FUNC_CODE) {
 		++ep;
+		last = (ep - ExtensionBlocks == (ExtensionBlockCount - 1));
 		VisibleDumpBuffer(ep->Bytes, ep->ByteCount);
 		putchar('\n');
 	    }
@@ -723,7 +725,10 @@ static void DumpExtensions(GifFileType *GifFileOut,
 	    printf("\ttransparent index %d\n", gcb.TransparentColor);
 	    printf("end\n\n");
 	}
-	else if (ep->Function == APPLICATION_EXT_FUNC_CODE 
+	else if (!last
+		 && ep->Function == APPLICATION_EXT_FUNC_CODE
+		 && ep->ByteCount >= 11
+		 && (ep+1)->ByteCount >= 3
 		 && memcmp(ep->Bytes, "NETSCAPE2.0", 11) == 0) {
 	    unsigned char *params = (++ep)->Bytes;
 	    unsigned int loopcount = params[1] | (params[2] << 8);
@@ -734,6 +739,7 @@ static void DumpExtensions(GifFileType *GifFileOut,
 	    VisibleDumpBuffer(ep->Bytes, ep->ByteCount);
 	    while (!last && ep[1].Function == CONTINUE_EXT_FUNC_CODE) {
 		++ep;
+		last = (ep - ExtensionBlocks == (ExtensionBlockCount - 1));
 		VisibleDumpBuffer(ep->Bytes, ep->ByteCount);
 		putchar('\n');
 	    }
@@ -846,7 +852,7 @@ static void Gif2Icon(char *FileName,
 	for (i = 0; i < image->ImageDesc.Height; i++) {
 	    for (j = 0; j < image->ImageDesc.Width; j++) {
 		GifByteType ch = image->RasterBits[i*image->ImageDesc.Width + j];
-		if (ColorCount < PRINTABLES)
+		if (ColorCount < PRINTABLES && ch < PRINTABLES)
 		    putchar(NameTable[ch]);
 		else
 		    printf("%02x", ch);
@@ -869,6 +875,17 @@ static void Gif2Icon(char *FileName,
 
     if (fdin == -1)
 	(void) printf("# End of %s dump\n", FileName);
+
+
+    /*
+     * Sanity checks.
+     */
+
+    /* check that the background color isn't garbage (SF bug #87) */
+    if (GifFile->SBackGroundColor < 0
+	    || GifFile->SBackGroundColor >= GifFile->SColorMap->ColorCount) {
+        fprintf(stderr, "gifbuild: background color invalid for screen colormap.\n");
+    }
 
     if (DGifCloseFile(GifFile, &ErrorCode) == GIF_ERROR) {
 	PrintGifError(ErrorCode);

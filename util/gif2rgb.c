@@ -15,7 +15,7 @@ Toshio Kuratomi had written this in a comment about the rgb2gif code:
 
 I (ESR) took this off the main to-do list in 2012 because I don't think
 the GIFLIB project actually needs to be in the converters-and-tools business.
-Plenty of hackers do that; our jub is to supply stable library capability
+Plenty of hackers do that; our job is to supply stable library capability
 with our utilities mainly interesting as test tools.
 
 ***************************************************************************/
@@ -181,9 +181,6 @@ static void SaveGif(GifByteType *OutputBuffer,
 			 0, 0, Width, Height, false, NULL) ==
 	                                                             GIF_ERROR)
 	PrintGifError(Error);
-	if (GifFile != NULL) {
-	    EGifCloseFile(GifFile, NULL);
-	}
 	exit(EXIT_FAILURE);
 
     GifQprintf("\n%s: Image 1 at (%d, %d) [%dx%d]:     ",
@@ -192,12 +189,7 @@ static void SaveGif(GifByteType *OutputBuffer,
 
     for (i = 0; i < Height; i++) {
 	if (EGifPutLine(GifFile, Ptr, Width) == GIF_ERROR)
-	{
-	    if (GifFile != NULL) {
-		EGifCloseFile(GifFile, NULL);
-	    }
 	    exit(EXIT_FAILURE);
-	}
 	GifQprintf("\b\b\b\b%-4d", Height - i - 1);
 
 	Ptr += Width;
@@ -205,9 +197,6 @@ static void SaveGif(GifByteType *OutputBuffer,
 
     if (EGifCloseFile(GifFile, &Error) == GIF_ERROR)
 	PrintGifError(Error);
-	if (GifFile != NULL) {
-	    EGifCloseFile(GifFile, NULL);
-	}
 	exit(EXIT_FAILURE);
 }
 
@@ -472,13 +461,19 @@ static void GIF2RGB(int NumFiles, char *FileName,
 		break;
 	}
     } while (RecordType != TERMINATE_RECORD_TYPE);
-
+    
     /* Lets dump it - set the global variables required and do it: */
     ColorMap = (GifFile->Image.ColorMap
 		? GifFile->Image.ColorMap
 		: GifFile->SColorMap);
     if (ColorMap == NULL) {
         fprintf(stderr, "Gif Image does not have a colormap\n");
+        exit(EXIT_FAILURE);
+    }
+
+    /* check that the background color isn't garbage (SF bug #87) */
+    if (GifFile->SBackGroundColor < 0 || GifFile->SBackGroundColor >= ColorMap->ColorCount) {
+        fprintf(stderr, "Background color out of range for colormap\n");
         exit(EXIT_FAILURE);
     }
 
